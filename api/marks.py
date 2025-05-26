@@ -1,48 +1,31 @@
-from flask import Flask, request, jsonify
+from http.server import BaseHTTPRequestHandler
 import json
 import os
+from urllib.parse import parse_qs, urlparse
 
-# 1. Initialize Flask app FIRST
-app = Flask(__name__)
-
-# 2. Load data file
-def load_marks_data():
-    try:
-        json_path = os.path.join(os.path.dirname(__file__), '..', 'q-vercel-python.json')
-        with open(json_path) as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Error loading data: {e}")
-        return []
-
-# 3. Define your API route
-@app.route('/api', methods=['GET'])
-def api_handler():
-    marks_data = load_marks_data()
-    names = request.args.getlist('name')
-    result = []
-    
-    for name in names:
-        found = next(
-            (item for item in marks_data 
-             if str(item.get('name', '')).lower() == name.lower()),
-            None
-        )
-        result.append(found['marks'] if found else None)
-    
-    return jsonify({"marks": result})
-
-# 4. Add root route for testing
-@app.route('/')
-def home():
-    return "Flask server is running. Access API at /api?name=TkErBC"
-
-# 5. CORS configuration
-@app.after_request
-def add_cors(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    return response
-
-# 6. Run the app
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        try:
+            # Load student data with correct filename
+            json_path = os.path.join(os.path.dirname(__file__), '..', 'q-vercel-python.json')
+            with open(json_path) as f:
+                students = json.load(f)
+            
+            # Get query parameters
+            query = parse_qs(urlparse(self.path).query)
+            names = query.get('name', [])
+            
+            # Get marks for requested names
+            marks = [students.get(name, 0) for name in names]
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            
+            self.wfile.write(json.dumps({"marks": marks}).encode())
+            
+        except Exception as e:s
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
